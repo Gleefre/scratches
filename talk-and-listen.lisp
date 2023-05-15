@@ -39,8 +39,6 @@
   (mixed:with-objects ((input (mixed:make-unpacker))
                        (output (mixed:make-packer))
                        (rep-r (mixed:make-repeat :time time :mode *mode*))
-                       (fr (mixed:make-biquad-filter))
-                       (fl (mixed:make-biquad-filter))
                        (rep-l (mixed:make-repeat :time time :mode *mode*))
                        (drain (make-instance 'org.shirakumo.fraf.mixed.pulse:drain
                                              :pack output))
@@ -49,14 +47,12 @@
     (make-instance 'talk-and-listen
                    :resizable T
                    :repeat-segment rep-r)
-    (mixed:with-buffers 500 (l r ll rr fll frr)
+    (mixed:with-buffers 500 (l r ll rr)
       (mixed:connect input :left rep-l :mono l)
-      (mixed:connect rep-l :mono fl :mono fll)
-      (mixed:connect fl :mono output :left ll)
+      (mixed:connect rep-l :mono output :left ll)
       (mixed:connect input :right rep-r :mono r)
-      (mixed:connect rep-r :mono fr :mono frr)
-      (mixed:connect fr :mono output :right rr)
-      (mixed:with-chain chain (mic input rep-l fl rep-r fr output drain)
+      (mixed:connect rep-r :mono output :right rr)
+      (mixed:with-chain chain (mic input rep-l rep-r output drain)
         (loop while *run*
               do (unless (eq *mode* (mixed:repeat-mode rep-r))
                    (case *mode*
