@@ -1,3 +1,7 @@
+;; Running:
+;;   sbcl --load talk-and-listen.lisp --quit
+;; Hold space to record.
+
 (ql:quickload '(:sketch :cl-mixed :cl-mixed-pulse))
 
 (add-package-local-nickname '#:mixed '#:org.shirakumo.fraf.mixed)
