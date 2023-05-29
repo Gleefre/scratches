@@ -1,6 +1,8 @@
 ;; This buffer is for text that is not saved, and for Lisp evaluation.
 ;; To create a file, visit it with C-x C-f and enter text in its buffer.
 
+(setf *random-state* (make-random-state T))
+
 (ql:quickload '(:harmony
                 :cl-mixed-pulse
                 :cl-mixed-mpg123
@@ -73,6 +75,15 @@
   (with-slots (name) app
     (setf name (and (not name)
                     (curr-name)))))
+
+(defmethod kit.sdl2:keyboard-event ((app shuffle-name) state ts rep? keysym)
+  (when (and (eq state :keydown)
+             (not rep?)
+             (eq (sdl2:scancode keysym) :scancode-n))
+    (next)))
+
+(defmethod kit.sdl2:close-window :after ((app shuffle-name))
+  (setf *stop* T))
 
 (make-instance 'shuffle-name :resizable t)
 (play-shuffle)
