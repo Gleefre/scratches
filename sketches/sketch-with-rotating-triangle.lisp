@@ -48,4 +48,4 @@
     (with-pen (make-pen :fill (canvas-image canvas))
       (rect 0 0 width height))))
 
-(make-instance 'render :resizable T)
+(make-instance 'render :resizable T :width 200 :height 200)
