@@ -47,12 +47,11 @@
           do (loop for pixel-x from minimal-x to maximal-x
                    do (loop for pixel-y from minimal-y to maximal-y
                             for point-depth = (triangle-contains flat-triangle (v:vec2 pixel-x pixel-y))
-                            when point-depth
-                            do (when (and (plusp point-depth)
-                                          (or (eq (aref depths pixel-x pixel-y) :infinity)
-                                              (< point-depth (aref depths pixel-x pixel-y))))
-                                 (setf (aref depths pixel-x pixel-y) point-depth)
-                                 (sketch:canvas-paint image color pixel-x pixel-y)))))
+                            when (and point-depth
+                                      (or (eq (aref depths pixel-x pixel-y) :infinity)
+                                          (< point-depth (aref depths pixel-x pixel-y))))
+                            do (setf (aref depths pixel-x pixel-y) point-depth)
+                               (sketch:canvas-paint image color pixel-x pixel-y))))
     (sketch:canvas-lock image)
     (sketch:canvas-image image)))
 
