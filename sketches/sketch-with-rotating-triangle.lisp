@@ -83,3 +83,10 @@
     (rect 0 0 width height)))
 
 (make-instance 'render :width 700 :height 700)
+(defmethod kit.sdl2:keyboard-event ((app render) st ts rep? keysym)
+  (when (and (eq st :keydown)
+             (not rep?))
+    (case (sdl2:scancode keysym)
+      ((:scancode-up :scancode-u) (incf (render-x app) 1/3))
+      ((:scancode-down :scancode-d) (decf (render-x app) 1/3)))))
+
