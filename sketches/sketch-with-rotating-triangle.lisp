@@ -82,7 +82,6 @@
   (with-pen (make-pen :fill (cl-raster/core::render/sk scene camera))
     (rect 0 0 width height)))
 
-(make-instance 'render :width 700 :height 700)
 (defmethod kit.sdl2:keyboard-event ((app render) st ts rep? keysym)
   (when (and (eq st :keydown)
              (not rep?))
@@ -90,3 +89,23 @@
       ((:scancode-up :scancode-u) (incf (render-x app) 1/3))
       ((:scancode-down :scancode-d) (decf (render-x app) 1/3)))))
 
+(when (find-symbol (string-upcase "define-start-function") :sketch)
+  (push :sketch-start-function *features*))
+
+#+:sketch-start-function
+(progn
+  (define-start-function (start) render (:width 700
+                                         :height 700))
+  (defun sketch::make-default-font ())
+  (start-toplevel)
+  (quit))
+
+#-sketch-start-function
+(progn
+  (defparameter *close* nil)
+  (defmethod kit.sdl2:close-window :after ((app render))
+    (setf *close* t))
+  (make-instance 'render :width 700 :height 700)
+  (loop until *close*
+        do (sleep 1)
+        finally (quit)))
