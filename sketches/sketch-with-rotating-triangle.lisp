@@ -97,6 +97,7 @@
   (define-start-function (start) render (:width 700
                                          :height 700))
   (defun sketch::make-default-font ())
+  (defun sketch::make-error-font ())
   (start-toplevel)
   (quit))
 
