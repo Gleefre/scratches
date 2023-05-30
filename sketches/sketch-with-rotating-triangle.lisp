@@ -1,3 +1,4 @@
+(in-package :cl-user)
 (use-package (ql:quickload :sketch))
 (ql:quickload :cl-raster)
 
@@ -7,15 +8,55 @@
 (defparameter *camera*
   (scene:make-camera :width 400
                      :height 400
-                     :center (vec:vec 0 0 0)
+                     :center (vec:vec 5 5 0)
                      :direction (vec:vec 0 0 1)
                      :x-vector (vec:vec 1 0 0)
                      :y-vector (vec:vec 0 1 0)))
 
 (defparameter *scene*
-  (scene:make-scene :triangles `((,(vec:vec 0 2 5)
-                                  ,(vec:vec 0 0 5)
-                                  ,(vec:vec 1 0 5)))))
+  (scene:make-scene :triangles `(((,(vec:vec 0 0 0)
+                                   ,(vec:vec 1 1 -1)
+                                   ,(vec:vec 0 -1 -1))
+                                  ,+green+)
+                                 ((,(vec:vec 0 0 0)
+                                   ,(vec:vec 1 1 -1)
+                                   ,(vec:vec -1 0 -1))
+                                  ,+blue+)
+                                 ((,(vec:vec 0 0 0)
+                                   ,(vec:vec -1 0 -1)
+                                   ,(vec:vec 0 -1 -1))
+                                  ,+yellow+)
+                                 ((,(vec:vec -1 0 -1)
+                                   ,(vec:vec 0 -1 -1)
+                                   ,(vec:vec 1 1 -1))
+                                  ,+white+))))
+
+(in-package :cl-raster/core)
+(defun render/sk (scene camera)
+  (let ((image (sketch:make-canvas (scene:camera-width camera) (scene:camera-height camera)))
+        (depths (make-array (list (scene:camera-width camera) (scene:camera-height camera))
+                            :initial-element :infinity)))
+    (loop for (triangle color) in (scene:scene-triangles scene)
+          for flat-triangle = (project-triangle-to-camera camera triangle)
+          for minimal-x = (max 0 (floor (reduce #'min flat-triangle :key #'d-p-x)))
+          for maximal-x = (min (1- (scene:camera-width camera))
+                               (ceiling (reduce #'max flat-triangle :key #'d-p-x)))
+          for minimal-y = (max 0 (floor (reduce #'min flat-triangle :key #'d-p-y)))
+          for maximal-y = (min (1- (scene:camera-height camera))
+                               (ceiling (reduce #'max flat-triangle :key #'d-p-y)))
+          do (loop for pixel-x from minimal-x to maximal-x
+                   do (loop for pixel-y from minimal-y to maximal-y
+                            for point-depth = (triangle-contains flat-triangle (v:vec2 pixel-x pixel-y))
+                            when point-depth
+                            do (when (and (plusp point-depth)
+                                          (or (eq (aref depths pixel-x pixel-y) :infinity)
+                                              (< point-depth (aref depths pixel-x pixel-y))))
+                                 (setf (aref depths pixel-x pixel-y) point-depth)
+                                 (sketch:canvas-paint image color pixel-x pixel-y)))))
+    (sketch:canvas-lock image)
+    (sketch:canvas-image image)))
+
+(in-package :cl-user)
 
 (defsketch render ((scene *scene*)
                    (camera *camera*)
@@ -23,29 +64,25 @@
   ;; update width and height
   (setf (scene:camera-width camera) width
         (scene:camera-height camera) height)
-  ;; rotate camera
-  (let ((rot-angle (/ pi 180)))
-    (3d-vectors:nvrot (scene:camera-x-vector camera)
-                      (3d-vectors:vec 0 0 1)
-                      rot-angle)
-    (3d-vectors:nvrot (scene:camera-y-vector camera)
-                      (3d-vectors:vec 0 0 1)
-                      rot-angle))
-  ;; move camera a little bit
-  (setf (vec:vz (scene:camera-center camera))
-        (* 1 (sin (* (incf i)
-                     (/ 180 1000 pi)))))
-  ;; render and copy to canvas
-  (let ((image (cl-raster/core:render scene camera))
-        (canvas (make-canvas width height)))
-    (dotimes (x width)
-      (dotimes (y height)
-        (canvas-paint canvas (apply #'rgb (mapcar (lambda (x)
-                                                    (/ x 255))
-                                                  (aref image x y)))
-                      x y)))
-    (canvas-lock canvas)
-    (with-pen (make-pen :fill (canvas-image canvas))
-      (rect 0 0 width height))))
+  ;; position camera
+  (setf (scene:camera-center camera) (vec:v+ (vec:vec 0 0 0)
+                                             (vec:vec (cos i)
+                                                      (sin i)
+                                                      3))
+        (scene:camera-direction camera) (vec:vunit (vec:v- (scene:camera-center camera)
+                                                           (vec:vec 0 0 0)))
+        (scene:camera-x-vector camera) (vec:vrot (scene:camera-direction camera)
+                                                 (vec:vec (cos i)
+                                                          (sin i)
+                                                          0)
+                                                 (/ pi 2))
+        (scene:camera-y-vector camera) (vec:vrot (scene:camera-direction camera)
+                                                 (scene:camera-x-vector camera)
+                                                 (/ pi 2)))
+  ;; update step
+  (incf i (/ pi 180))
+  ;; render to canvas and draw to screen
+  (with-pen (make-pen :fill (cl-raster/core::render/sk scene camera))
+    (rect 0 0 width height)))
 
-(make-instance 'render :resizable T :width 200 :height 200)
+(make-instance 'render :width 700 :height 700)
