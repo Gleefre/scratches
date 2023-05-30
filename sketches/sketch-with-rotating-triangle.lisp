@@ -61,14 +61,14 @@
 (defsketch render ((scene *scene*)
                    (camera *camera*)
                    (i 0)
-                   (x 1))
+                   (x 2/3))
   ;; update width and height
   (setf (scene:camera-width camera) width
         (scene:camera-height camera) height)
   ;; position camera
   (setf (scene:camera-center camera) (vec:v+ (vec:vec 0 0 0)
-                                             (vec:vec (* 3 (cos i))
-                                                      (* 3 (sin i))
+                                             (vec:vec (* 3.5 (cos i))
+                                                      (* 3.5 (sin i))
                                                       x))
         (scene:camera-direction camera) (vec:vunit (vec:v- (scene:camera-center camera)
                                                            (vec:vec 0 0 x)))
