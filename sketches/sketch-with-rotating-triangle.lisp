@@ -14,7 +14,7 @@
                      :y-vector (vec:vec 0 1 0)))
 
 (defparameter *scene*
-  (scene:make-scene :triangles `(((,(vec:vec 0 0 0)
+  (scene:make-scene :triangles `(((,(vec:vec 0 0 0 )
                                    ,(vec:vec 1 1 -1)
                                    ,(vec:vec 0 -1 -1))
                                   ,+green+)
@@ -26,9 +26,9 @@
                                    ,(vec:vec -1 0 -1)
                                    ,(vec:vec 0 -1 -1))
                                   ,+yellow+)
-                                 ((,(vec:vec -1 0 -1)
-                                   ,(vec:vec 0 -1 -1)
-                                   ,(vec:vec 1 1 -1))
+                                 ((,(vec:vec -1 0 -2/3)
+                                   ,(vec:vec 0 -1 -2/3)
+                                   ,(vec:vec 1 1 -2/3))
                                   ,+white+))))
 
 (in-package :cl-raster/core)
@@ -60,24 +60,21 @@
 
 (defsketch render ((scene *scene*)
                    (camera *camera*)
-                   (i 0))
+                   (i 0)
+                   (x 1))
   ;; update width and height
   (setf (scene:camera-width camera) width
         (scene:camera-height camera) height)
   ;; position camera
   (setf (scene:camera-center camera) (vec:v+ (vec:vec 0 0 0)
-                                             (vec:vec (cos i)
-                                                      (sin i)
-                                                      3))
+                                             (vec:vec (* 3 (cos i))
+                                                      (* 3 (sin i))
+                                                      x))
         (scene:camera-direction camera) (vec:vunit (vec:v- (scene:camera-center camera)
-                                                           (vec:vec 0 0 0)))
+                                                           (vec:vec 0 0 x)))
+        (scene:camera-y-vector camera) (vec:vec 0 0 1)
         (scene:camera-x-vector camera) (vec:vrot (scene:camera-direction camera)
-                                                 (vec:vec (cos i)
-                                                          (sin i)
-                                                          0)
-                                                 (/ pi 2))
-        (scene:camera-y-vector camera) (vec:vrot (scene:camera-direction camera)
-                                                 (scene:camera-x-vector camera)
+                                                 (scene:camera-y-vector camera)
                                                  (/ pi 2)))
   ;; update step
   (incf i (/ pi 180))
