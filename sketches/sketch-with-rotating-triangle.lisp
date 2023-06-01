@@ -91,7 +91,7 @@
 (when (find-symbol (string-upcase "define-start-function") :sketch)
   (push :sketch-start-function *features*))
 
-#+:sketch-start-function
+#+sketch-start-function
 (progn
   (define-start-function (start) render (:width 700
                                          :height 700))
