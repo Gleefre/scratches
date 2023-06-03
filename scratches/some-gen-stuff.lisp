@@ -9,7 +9,7 @@
   (when harmony:*server*
     (org.shirakumo.fraf.harmony.user:stop harmony:*server*)
     (setf harmony:*server* nil))
-  (harmony:maybe-start-simple-server :drain drain))
+  (harmony:maybe-start-simple-server :drain drain :mixers `(:effect)))
 
 (defun fg-sin (phase)
   (sin (* 2 pi phase)))
@@ -27,6 +27,10 @@
 
 (defun fg-sawtooth (phase)
   (1- (* phase 2)))
+
+(defun fg-noise (x)
+  (declare (ignore x))
+  (- (random 2.0) 1))
 
 (defmacro mix ((phase) &body clauses &aux (!x (gensym "x"))
                                           (!ci (loop repeat (length clauses)
@@ -46,17 +50,19 @@
             ,!cs))))
 
 (progn
-  (defparameter *sin*      3/8)
-  (defparameter *sawtooth* 1/8)
-  (defparameter *square*   0)
-  (defparameter *triangle* 1/8))
+  (defparameter *sin*      1)
+  (defparameter *sawtooth* 0)
+  (defparameter *square*   -1/2)
+  (defparameter *triangle* 1)
+  (defparameter *noise*    0))
 
 (defun fg-try (x)
   (mix (x)
     (*sin*      fg-sin)
     (*sawtooth* fg-sawtooth)
     (*square*   fg-square)
-    (*triangle* fg-triangle)))
+    (*triangle* fg-triangle)
+    (*noise*    fg-noise)))
 
 (defun fg-synth (time &optional release-p)
   (if release-p
@@ -68,7 +74,12 @@
                           (sustain 0.3)
                           (release 1))
   (lambda (time &optional release-p)
-    (cond ((< time attack)
+    (cond ((and release-p (<= release-p time))
+           (max 0 (* sustain (- 1 (if (zerop release)
+                                      1
+                                      (/ (- time release-p)
+                                         release))))))
+          ((< time attack)
            (if (zerop attack)
                1
                (/ time attack)))
@@ -76,15 +87,19 @@
            (- 1 (* (- 1 sustain) (if (zerop decay)
                                      1
                                      (/ (- time attack) decay)))))
-          (release-p (max 0 (* sustain (- 1 (if (zerop release)
-                                                1
-                                                (/ (- time (max release-p (+ attack decay)))
-                                                   release))))))
           (T sustain))))
 
-(defparameter *fg-synth* (fd-adsr 0 0.5 0 0))
+(progn
+  (defparameter *attack*  0)
+  (defparameter *decay*   1/4)
+  (defparameter *sustain* 0)
+  (defparameter *release* 0))
 
-;(make-ontes)
+(defun fg-global-adsr (time &optional release-p)
+  (funcall (fd-adsr *attack* *decay* *sustain* *release*) time release-p))
+
+(defparameter *release-point* 1)
+(defparameter *fg-synth* 'fg-global-adsr)
 
 (defclass fun-generator (mixed:virtual)
   ((func :initarg :function :initform #'fg-sin :accessor func)
@@ -93,7 +108,7 @@
    (note :initarg :note :initform 0 :accessor note)
    (frequency :initarg :frequency :initform 440 :accessor frequency)
    (synth :initarg :synth :initform #'fg-synth :accessor synth)
-   (volume :initarg :volume :initform 0.5 :accessor volume)
+   (volume :initarg :volume :initform 0.25 :accessor volume)
    (release-p :initarg :release-p :initform NIL :accessor release-p)
    (fg-endp :initform NIL :accessor fg-endp)))
 
@@ -120,6 +135,7 @@
                                (/ release-p samplerate))))
       (setf fg-endp T)
       (push fg *fg-to-close*))
+    #+debug
     (when (zerop offset)
       (print (list :start-at (float (stopclock:time (gethash (note fg)
                                                              *clocks*
@@ -173,14 +189,14 @@
 (defun c (name)
   (getf *colors* name))
 
-(defun draw-fun (fun x y w h &optional (dx 1/100) (maxx 1))
+(defun draw-fun (fun x y w h &optional (dx 1/100) (maxx 1) args)
   (s:with-current-matrix
     (s:translate x y)
     (s:with-pen (s:make-pen :stroke (c :fun))
       (apply #'s:polyline
              (loop for x from 0 to maxx by dx
                    collect (/ (* x w) maxx)
-                   collect (* h (/ (1+ (- (funcall fun x)))
+                   collect (* h (/ (1+ (- (apply fun x args)))
                                    2)))))))
 
 (defmacro with-margin ((var-x var-w c &optional (c2 c)) &body body
@@ -191,7 +207,7 @@
            (,var-w (- ,var-w (* (+ ,!c2 ,!c) ,var-w))))
        ,@body)))
 
-(defun draw-chooser (state fun x y w h &optional (dx 1/100))
+(defun draw-chooser (state fun x y w h &optional (dx 1/100) (maxx 1) &rest args)
   (with-margin (x w 1/20)
     (with-margin (y h 1/20)
       (s:with-pen (s:make-pen :fill (c :cback))
@@ -202,7 +218,7 @@
             (s:rect x y w h))
           (with-margin (x w 1/20)
             (with-margin (y h 1/20)
-              (draw-fun fun x y w h dx)))))
+              (draw-fun fun x y w h dx maxx args)))))
       (with-margin (x w 1/20)
         (with-margin (y h (+ 3/4 1/40) 1/20)
           (s:with-pen (s:make-pen :stroke (c :border))
@@ -274,7 +290,7 @@
                                                (note (and onte (note onte))))
                                           (if (and note
                                                    (member (mod note 12)
-                                                           '(0)))
+                                                           '(3)))
                                               :funkey
                                               :font)))
                               :size font-size)
@@ -309,37 +325,29 @@
     (s:with-current-matrix
       (dolist (row *rows*)
         (draw-row row)
-        (s:translate 0 *unit*))
-      (draw-fun *fg-synth*
-                (* *margin* *unit*)
-                (* *margin* *unit*)
-                (* *unit* (- (keyboard-width) (* 2 *margin*)))
-                (* 2 (* *unit* (- 2 (* 2 *margin*))))
-                (/ 10)
-                10))))
+        (s:translate 0 *unit*)))))
 
 (defun make-onte (k)
   (make-instance 'fun-generator
                  :function 'fg-try
                  :frequency (* 440 (expt 2 (/ k 12)))
                  :synth *fg-synth*
-                 :volume 0.1
                  :note k))
 
 (defun play-onte (onte)
   (fg-reset onte)
   (setf (gethash (note onte) *clocks*)
         (stopclock:make-clock))
-  (harmony:play onte :reset T))
+  (harmony:play onte :reset T :mixer :effect))
 
 (defun stop-onte (onte)
   (release onte))
 
 (defparameter *ontes* (make-hash-table))
 
-(defun make-ontes ()
+(defun make-ontes (&optional (base -20) (d-base 5))
   (loop for (row-keys) in *rows*
-        for base from -20 by 5
+        for base from base by d-base
         do (loop for key in row-keys
                  for k from base
                  do (setf (gethash key *ontes*)
@@ -363,11 +371,28 @@
                    :max-height (* 1/2 s:height)))
   (let ((x (/ s:width 4))
         (y (/ s:height 6)))
-    (draw-chooser 1 'fg-try (* 3/2 x) (* 3 y) x y)
-    (draw-chooser *sin*      'fg-sin           x  (* 4 y) x y)
-    (draw-chooser *sawtooth* 'fg-sawtooth (* 2 x) (* 4 y) x y)
-    (draw-chooser *square*   'fg-square        x  (* 5 y) x y)
-    (draw-chooser *triangle* 'fg-triangle (* 2 x) (* 5 y) x y)))
+    (draw-chooser 1 'fg-try (* 1/2 x) (* 2 y) x y)
+    (draw-chooser *sin*      'fg-sin           0 (* 3 y) x y)
+    (draw-chooser *sawtooth* 'fg-sawtooth      x (* 3 y) x y)
+    (draw-chooser *square*   'fg-square        0 (* 4 y) x y)
+    (draw-chooser *triangle* 'fg-triangle      x (* 4 y) x y)
+
+    (draw-chooser *noise*    'fg-noise         0 (* 5 y) x y)
+
+    (draw-chooser (/ *release-point* 2) *fg-synth* (* 3/2 x) (* 2 y) (* 2 x) y 1/100 2 *release-point*)
+
+    (draw-chooser *attack* (constantly 0) (* 2 x) (* 3 y) x y)
+    (s:with-font (s:make-font :color (c :fun) :align :center)
+      (s:text "Attack" (* (+ 1/2 2) x) (* (+ 1/2 3) y)))
+    (draw-chooser *decay* (constantly 0) (* 3 x) (* 3 y) x y)
+    (s:with-font (s:make-font :color (c :fun) :align :center)
+      (s:text "Decay" (* (+ 1/2 3) x) (* (+ 1/2 3) y)))
+    (draw-chooser *sustain* (constantly 0) (* 2 x) (* 4 y) x y)
+    (s:with-font (s:make-font :color (c :fun) :align :center)
+      (s:text "Sustain" (* (+ 1/2 2) x) (* (+ 1/2 4) y)))
+    (draw-chooser *release* (constantly 0) (* 3 x) (* 4 y) x y)
+    (s:with-font (s:make-font :color (c :fun) :align :center)
+      (s:text "Release" (* (+ 1/2 3) x) (* (+ 1/2 4) y)))))
 
 (defparameter *tracker* (make-instance 'kit.sdl2:keystate-tracker))
 
@@ -380,26 +405,26 @@
 
 (defmethod kit.sdl2:mousebutton-event ((app vroom) st ts button mx my)
   (when (eq st :mousebuttondown)
-    (if (= button 2)
-        (let ((x (/ (s:sketch-width app) 4))
-              (y (/ (s:sketch-height app) 6)))
-          (setf *sin*      (print (or (new-state mx my      x  (* 4 y) x y -1) *sin*)))
-          (setf *sawtooth* (or (new-state mx my (* 2 x) (* 4 y) x y -1) *sawtooth*))
-          (setf *square*   (or (new-state mx my      x  (* 5 y) x y -1) *square*))
-          (setf *triangle* (or (new-state mx my (* 2 x) (* 5 y) x y -1) *triangle*)))
-        (let ((x (/ (s:sketch-width app) 4))
-              (y (/ (s:sketch-height app) 6)))
-          (setf *sin*      (or (new-state mx my      x  (* 4 y) x y) *sin*))
-          (setf *sawtooth* (or (new-state mx my (* 2 x) (* 4 y) x y) *sawtooth*))
-          (setf *square*   (or (new-state mx my      x  (* 5 y) x y) *square*))
-          (setf *triangle* (or (new-state mx my (* 2 x) (* 5 y) x y) *triangle*))))))
+    (let ((neg (if (= button 3) -1 1)))
+      (let ((x (/ (s:sketch-width app) 4))
+            (y (/ (s:sketch-height app) 6)))
+        (setf *sin*           (or (new-state mx my        0  (* 3 y)      x  y neg) *sin*))
+        (setf *sawtooth*      (or (new-state mx my        x  (* 3 y)      x  y neg) *sawtooth*))
+        (setf *square*        (or (new-state mx my        0  (* 4 y)      x  y neg) *square*))
+        (setf *triangle*      (or (new-state mx my        x  (* 4 y)      x  y neg) *triangle*))
+        (setf *noise*         (or (new-state mx my        0  (* 5 y)      x  y neg) *noise*))
+        (setf *attack*        (or (new-state mx my (*   2 x) (* 3 y)      x  y   1) *attack*))
+        (setf *decay*         (or (new-state mx my (*   3 x) (* 3 y)      x  y   1) *decay*))
+        (setf *sustain*       (or (new-state mx my (*   2 x) (* 4 y)      x  y   1) *sustain*))
+        (setf *release*       (or (new-state mx my (*   3 x) (* 4 y)      x  y   1) *release*))
+        (setf *release-point* (or (new-state mx my (* 3/2 x) (* 2 y) (* 2 x) y   2) *release-point*))))))
 
 (defun current-key-down-p (code)
   (not (kit.sdl2:key-down-p *tracker* code)))
 
 (progn
   (h-restart)
-  (make-ontes)
+  (make-ontes -21 8)
   (make-instance 'vroom :resizable t :width 750 :height 800))
 
 #+nil
