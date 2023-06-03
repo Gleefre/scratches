@@ -1,9 +1,11 @@
-(ql:quickload '(:harmony :cl-mixed :sketch :stopclock))
+(ql:quickload '(:harmony :cl-mixed :sketch :stopclock :sketch-fit))
 
 (progn
   (add-package-local-nickname '#:mixed   '#:org.shirakumo.fraf.mixed)
   (add-package-local-nickname '#:harmony '#:org.shirakumo.fraf.harmony)
-  (add-package-local-nickname '#:s       '#:sketch))
+  (add-package-local-nickname '#:s       '#:sketch)
+  (add-package-local-nickname '#:sf      '#:sketch-fit)
+  (add-package-local-nickname '#:sc      '#:stopclock))
 
 (defun h-restart (&optional (drain :pulse))
   (when harmony:*server*
@@ -101,6 +103,11 @@
 (defparameter *release-point* 1)
 (defparameter *fg-synth* 'fg-global-adsr)
 
+(defparameter *volume* 1)
+
+(defun fg-volume ()
+  *volume*)
+
 (defclass fun-generator (mixed:virtual)
   ((func :initarg :function :initform #'fg-sin :accessor func)
    (offset :initform 0 :accessor offset)
@@ -108,7 +115,7 @@
    (note :initarg :note :initform 0 :accessor note)
    (frequency :initarg :frequency :initform 440 :accessor frequency)
    (synth :initarg :synth :initform #'fg-synth :accessor synth)
-   (volume :initarg :volume :initform 0.25 :accessor volume)
+   (volume :initarg :volume :initform #'fg-volume :accessor volume)
    (release-p :initarg :release-p :initform NIL :accessor release-p)
    (fg-endp :initform NIL :accessor fg-endp)))
 
@@ -124,10 +131,17 @@
   (setf (fg-endp fg) NIL)
   (setf (release-p fg) NIL))
 
+#+debug
 (defparameter *clocks* (make-hash-table))
 
 (defmethod mixed:mix ((fg fun-generator))
   (with-slots (func offset samplerate frequency synth volume release-p fg-endp) fg
+    #+debug
+    (when (zerop offset)
+      (print (list :start-at (float (stopclock:time (gethash (note fg)
+                                                             *clocks*
+                                                             (sc:make-clock))))
+                   :note (note fg))))
     (when (and (not fg-endp)
                release-p
                (zerop (funcall synth
@@ -135,27 +149,27 @@
                                (/ release-p samplerate))))
       (setf fg-endp T)
       (push fg *fg-to-close*))
-    #+debug
-    (when (zerop offset)
-      (print (list :start-at (float (stopclock:time (gethash (note fg)
-                                                             *clocks*
-                                                             (stopclock:make-clock))))
-                   :note (note fg))))
     (mixed:with-buffer-tx (data start size (aref (mixed:outputs fg) 0) :direction :output)
-      (loop repeat size
-            for index from start
-            for offset from offset
-            for res = (coerce (* (funcall func (/ (mod (* offset frequency) samplerate)
-                                                  samplerate))
-                                 (funcall synth
-                                          (/ offset samplerate)
-                                          (and release-p (/ release-p samplerate)))
-                                 volume)
-                              'single-float)
-            do (assert (<= -1.0 res 1.0))
-               (setf (aref data index) res))
-      (incf offset size)
-      (mixed:finish size))))
+      (mixed:with-buffer-tx (data-2 start-2 size-2 (aref (mixed:outputs fg) 1) :direction :output)
+        (setf size (min size size-2))
+        (setf size-2 (min size size-2))
+        (loop repeat size
+              for index from start
+              for index-2 from start-2
+              for offset from offset
+              for res = (coerce (* (funcall func (/ (mod (* offset frequency) samplerate)
+                                                    samplerate))
+                                   (funcall synth
+                                            (/ offset samplerate)
+                                            (and release-p (/ release-p samplerate)))
+                                   (funcall volume))
+                                'single-float)
+              do (assert (<= -1.0 res 1.0))
+                 (setf (aref data index) res
+                       (aref data-2 index-2) res))
+        (incf offset (min size size-2))
+        (mixed:finish size-2))
+      (mixeD:finish size))))
 
 (defmethod mixed:seek ((segment fun-generator) position &key)
   (setf (offset segment) position)
@@ -170,7 +184,7 @@
         :flags 0
         :min-inputs 0
         :max-inputs 0
-        :outputs 1
+        :outputs 2
         :fields ()))
 
 (defparameter *colors*
@@ -336,8 +350,8 @@
 
 (defun play-onte (onte)
   (fg-reset onte)
-  (setf (gethash (note onte) *clocks*)
-        (stopclock:make-clock))
+  #+debug
+  (setf (gethash (note onte) *clocks*) (sc:make-clock))
   (harmony:play onte :reset T :mixer :effect))
 
 (defun stop-onte (onte)
@@ -363,61 +377,133 @@
     (when onte
       (stop-onte onte))))
 
+(progn
+  (defparameter *mode* :none)
+  (defparameter *clock* (sc:make-clock :paused NIL))
+  (defparameter *rec-time* 8)
+  (defparameter *recording* ())
+  (defparameter *last-time* 0)
+  (defparameter *next-index* 0))
+
+(defun save-recording (keysym state)
+  (push (list (mod (sc:time *clock*) *rec-time*)
+              (sdl2:scancode keysym)
+              state
+              (sdl2:scancode-value keysym))
+        *recording*)
+  (setf *recording* (sort *recording* #'< :key #'car)))
+
+(defun play-recording (code state scancode-value)
+  (kit.sdl2::keystate-update-value *tracker* state nil scancode-value)
+  (case state
+    (:keydown (play-code code))
+    (:keyup   (stop-code code))))
+
+(defun play-by-clock ()
+  (when (eq *mode* :play)
+    (let ((time (mod (sc:time *clock*) *rec-time*)))
+      (when (> *last-time* time)
+        (setf *next-index* 0))
+      (setf *last-time* time)
+      (loop while (< *next-index* (length *recording*))
+            for (rec-time . recording) = (nth *next-index* *recording*)
+            while (>= time rec-time)
+            do (apply #'play-recording recording)
+               (incf *next-index*)))))
+
 (s:defsketch vroom ()
-  (close-silents)
-  (s:background (c :back))
-  (let ((*unit* 200))
-    (draw-keyboard :max-width s:width
-                   :max-height (* 1/2 s:height)))
-  (let ((x (/ s:width 4))
-        (y (/ s:height 6)))
-    (draw-chooser 1 'fg-try (* 1/2 x) (* 2 y) x y)
-    (draw-chooser *sin*      'fg-sin           0 (* 3 y) x y)
-    (draw-chooser *sawtooth* 'fg-sawtooth      x (* 3 y) x y)
-    (draw-chooser *square*   'fg-square        0 (* 4 y) x y)
-    (draw-chooser *triangle* 'fg-triangle      x (* 4 y) x y)
+  (sf:fit 800 800 s:width s:height)
+  (let ((s:width 800)
+        (s:height 800))
+    (close-silents)
+    (s:background (c :back))
+    (let ((*unit* 200))
+      (draw-keyboard :max-width s:width
+                     :max-height (* 1/2 s:height)))
+    (let ((x (/ s:width 4))
+          (y (/ s:height 6)))
+      (draw-chooser *volume*   'fg-try (* 1/2 x) (* 2 y) x y)
+      (draw-chooser *sin*      'fg-sin           0 (* 3 y) x y)
+      (draw-chooser *sawtooth* 'fg-sawtooth      x (* 3 y) x y)
+      (draw-chooser *square*   'fg-square        0 (* 4 y) x y)
+      (draw-chooser *triangle* 'fg-triangle      x (* 4 y) x y)
 
-    (draw-chooser *noise*    'fg-noise         0 (* 5 y) x y)
+      (draw-chooser *noise*    'fg-noise         0 (* 5 y) x y)
 
-    (draw-chooser (/ *release-point* 2) *fg-synth* (* 3/2 x) (* 2 y) (* 2 x) y 1/100 2 *release-point*)
+      (draw-chooser (/ *release-point* 2) *fg-synth* (* 3/2 x) (* 2 y) (* 2 x) y 1/100 2 *release-point*)
 
-    (draw-chooser *attack* (constantly 0) (* 2 x) (* 3 y) x y)
-    (s:with-font (s:make-font :color (c :fun) :align :center)
-      (s:text "Attack" (* (+ 1/2 2) x) (* (+ 1/2 3) y)))
-    (draw-chooser *decay* (constantly 0) (* 3 x) (* 3 y) x y)
-    (s:with-font (s:make-font :color (c :fun) :align :center)
-      (s:text "Decay" (* (+ 1/2 3) x) (* (+ 1/2 3) y)))
-    (draw-chooser *sustain* (constantly 0) (* 2 x) (* 4 y) x y)
-    (s:with-font (s:make-font :color (c :fun) :align :center)
-      (s:text "Sustain" (* (+ 1/2 2) x) (* (+ 1/2 4) y)))
-    (draw-chooser *release* (constantly 0) (* 3 x) (* 4 y) x y)
-    (s:with-font (s:make-font :color (c :fun) :align :center)
-      (s:text "Release" (* (+ 1/2 3) x) (* (+ 1/2 4) y)))))
+      (draw-chooser *attack* (constantly 0) (* 2 x) (* 3 y) x y)
+      (s:with-font (s:make-font :color (c :fun) :align :center)
+        (s:text "Attack" (* (+ 1/2 2) x) (* (+ 1/2 3) y)))
+      (draw-chooser *decay* (constantly 0) (* 3 x) (* 3 y) x y)
+      (s:with-font (s:make-font :color (c :fun) :align :center)
+        (s:text "Decay" (* (+ 1/2 3) x) (* (+ 1/2 3) y)))
+      (draw-chooser *sustain* (constantly 0) (* 2 x) (* 4 y) x y)
+      (s:with-font (s:make-font :color (c :fun) :align :center)
+        (s:text "Sustain" (* (+ 1/2 2) x) (* (+ 1/2 4) y)))
+      (draw-chooser *release* (constantly 0) (* 3 x) (* 4 y) x y)
+      (s:with-font (s:make-font :color (c :fun) :align :center)
+        (s:text "Release" (* (+ 1/2 3) x) (* (+ 1/2 4) y)))
+      (draw-chooser (/ *rec-time* 8) (constantly 0) (* 3/2 x) (* 5 y) x y)
+      (s:with-font (s:make-font :color (c :fun) :align :center)
+        (s:text "Record time" (* (+ 1/2 3/2) x) (* (+ 1/2 5) y)))
+      (draw-chooser (/ (mod (sc:time *clock*) *rec-time*) *rec-time*) (constantly 0) (* 5/2 x) (* 5 y) x y)
+      (s:with-font (s:make-font :color (c :fun) :align :center)
+        (s:text "Current time" (* (+ 1/2 5/2) x) (* (+ 1/2 5) y)))))
+  (s:with-font (s:make-font :color (c :fun) :align :center)
+    (s:text (case *mode*
+              (:play "Playing")
+              (:record "Recording")
+              (:none "Standby"))
+            50 300)
+    (play-by-clock)
+    (s:text (princ-to-string *next-index*) 400 400)))
 
 (defparameter *tracker* (make-instance 'kit.sdl2:keystate-tracker))
 
 (defmethod kit.sdl2:keyboard-event ((app vroom) state ts rep? keysym)
-  (kit.sdl2:keystate-update *tracker* state rep? keysym)
   (unless rep?
-    (case state
-      (:keydown (play-code (sdl2:scancode keysym)))
-      (:keyup   (stop-code (sdl2:scancode keysym))))))
+    (case (sdl2:scancode keysym)
+      (:scancode-kp-5 (when (eq state :keydown)
+                        (sc:toggle *clock*)))
+      (:scancode-kp-1 (when (eq state :keydown)
+                        (setf *mode* :record
+                              *recording* nil)))
+      (:scancode-kp-2 (when (eq state :keydown)
+                        (setf *mode* :none)))
+      (:scancode-kp-3 (when (eq state :keydown)
+                        (setf *mode* :play)))
+      (T
+       (unless (eq *mode* :play)
+         (kit.sdl2:keystate-update *tracker* state rep? keysym)
+         (when (eq *mode* :record)
+           (save-recording keysym state))
+         (case state
+           (:keydown (play-code (sdl2:scancode keysym)))
+           (:keyup   (stop-code (sdl2:scancode keysym)))))))))
 
 (defmethod kit.sdl2:mousebutton-event ((app vroom) st ts button mx my)
   (when (eq st :mousebuttondown)
-    (let ((neg (if (= button 3) -1 1)))
-      (let ((x (/ (s:sketch-width app) 4))
-            (y (/ (s:sketch-height app) 6)))
-        (setf *sin*           (or (new-state mx my        0  (* 3 y)      x  y neg) *sin*))
-        (setf *sawtooth*      (or (new-state mx my        x  (* 3 y)      x  y neg)    *sawtooth*))
-        (setf *square*        (or (new-state mx my        0  (* 4 y)      x  y neg)    *square*))
-        (setf *triangle*      (or (new-state mx my        x  (* 4 y)      x  y neg)    *triangle*))
-        (setf *noise*         (or (new-state mx my        0  (* 5 y)      x  y neg)    *noise*))
-        (setf *attack*        (or (new-state mx my (*   2 x) (* 3 y)      x  y   1 16) *attack*))
-        (setf *decay*         (or (new-state mx my (*   3 x) (* 3 y)      x  y   1 16) *decay*))
-        (setf *sustain*       (or (new-state mx my (*   2 x) (* 4 y)      x  y   1 16) *sustain*))
-        (setf *release*       (or (new-state mx my (*   3 x) (* 4 y)      x  y   1 16) *release*))
-        (setf *release-point* (or (new-state mx my (* 3/2 x) (* 2 y) (* 2 x) y   2 16) *release-point*))))))
+    (destructuring-bind (mx my) (sf:fit-point mx my
+                                              800 800
+                                              (s:sketch-width app) (s:sketch-height app))
+      (let ((s:width 800)
+            (s:height 800))
+        (let ((neg (if (= button 3) -1 1)))
+          (let ((x (/ s:width 4))
+                (y (/ s:height 6)))
+            (setf *volume*        (or (new-state mx my (* 1/2 x) (* 2 y)      x  y   1)    *volume*))
+            (setf *sin*           (or (new-state mx my        0  (* 3 y)      x  y neg)    *sin*))
+            (setf *sawtooth*      (or (new-state mx my        x  (* 3 y)      x  y neg)    *sawtooth*))
+            (setf *square*        (or (new-state mx my        0  (* 4 y)      x  y neg)    *square*))
+            (setf *triangle*      (or (new-state mx my        x  (* 4 y)      x  y neg)    *triangle*))
+            (setf *noise*         (or (new-state mx my        0  (* 5 y)      x  y neg)    *noise*))
+            (setf *attack*        (or (new-state mx my (*   2 x) (* 3 y)      x  y   1 20) *attack*))
+            (setf *decay*         (or (new-state mx my (*   3 x) (* 3 y)      x  y   1 20) *decay*))
+            (setf *sustain*       (or (new-state mx my (*   2 x) (* 4 y)      x  y   1 20) *sustain*))
+            (setf *release*       (or (new-state mx my (*   3 x) (* 4 y)      x  y   1 20) *release*))
+            (setf *release-point* (or (new-state mx my (* 3/2 x) (* 2 y) (* 2 x) y   2 50) *release-point*))
+            (setf *rec-time*      (or (new-state mx my (* 3/2 x) (* 5 y)      x  y   8 8) *rec-time*))))))))
 
 (defmethod kit.sdl2:close-window :after ((app vroom))
   (harmony:stop harmony:*server*))
