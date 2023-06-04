@@ -1,3 +1,5 @@
+(in-package #:cl-user)
+
 (ql:quickload '(:harmony :cl-mixed :sketch :stopclock :sketch-fit))
 
 (progn
@@ -76,12 +78,7 @@
                           (sustain 0.3)
                           (release 1))
   (lambda (time &optional release-p)
-    (cond ((and release-p (<= release-p time))
-           (max 0 (* sustain (- 1 (if (zerop release)
-                                      1
-                                      (/ (- time release-p)
-                                         release))))))
-          ((< time attack)
+    (cond ((< time attack)
            (if (zerop attack)
                1
                (/ time attack)))
@@ -89,7 +86,13 @@
            (- 1 (* (- 1 sustain) (if (zerop decay)
                                      1
                                      (/ (- time attack) decay)))))
-          (T sustain))))
+          ((and release-p (<= release-p time))
+           (let ((result (max 0 (* sustain (- 1 (if (zerop release)
+                                                    1
+                                                    (/ (- time release-p)
+                                                       release)))))))
+             (values result (zerop result))))
+          (T (values sustain (zerop sustain))))))
 
 (progn
   (defparameter *attack*  0)
@@ -144,9 +147,9 @@
                    :note (note fg))))
     (when (and (not fg-endp)
                release-p
-               (zerop (funcall synth
-                               (/ offset samplerate)
-                               (/ release-p samplerate))))
+               (nth-value 1 (funcall synth
+                                     (/ offset samplerate)
+                                     (/ release-p samplerate))))
       (setf fg-endp T)
       (push fg *fg-to-close*))
     (mixed:with-buffer-tx (data start size (aref (mixed:outputs fg) 0) :direction :output)
@@ -180,7 +183,7 @@
 
 (defmethod mixed:info ((segment fun-generator))
   (list :name "fun-generator"
-        :description "Simple one-channel function generator"
+        :description "Simple two channel function generator"
         :flags 0
         :min-inputs 0
         :max-inputs 0
@@ -515,6 +518,49 @@
   (h-restart)
   (make-ontes -21 8)
   (make-instance 'vroom :resizable t :width 750 :height 800))
+
+(defun note-file (k)
+  (pathname (format nil "~~/Downloads/temp/note-~a.wav" k)))
+
+(ql:quickload :cl-mixed-wav)
+
+(defun save-note (k &key (encoding :float))
+  (let ((file (note-file k)))
+    (mixed:with-objects ((note (make-instance 'fun-generator
+                                              :function 'fg-try
+                                              :frequency (* 440 (expt 2 (/ k 12)))
+                                              :synth *fg-synth*
+                                              :note k))
+                         (drain (mixed:make-packer :encoding encoding))
+                         (out (make-instance 'org.shirakumo.fraf.mixed.wav:file-drain
+                                             :file (pathname file) :pack drain)))
+      (mixed:with-buffers 500 (l r)
+        (mixed:connect note :left drain :left l)
+        (mixed:connect note :right drain :right r)
+        (fg-reset note)
+        (release note)
+        (mixed:with-chain chain (note drain out)
+          (format T "~&Writing to ~a with ~d channels @ ~dHz, ~a~%"
+                  file (mixed:channels drain) (mixed:samplerate drain) (mixed:encoding drain))
+          (loop until (fg-endp note)
+                do (mixed:mix chain))
+          (format T "Wrote ~d frames." (mixed:frame-position out)))))))
+
+(defun save-notes (from to)
+  (loop for k from from to to
+        do (save-note k)))
+
+(progn
+  (setf *attack* 0
+        *decay* 1/10
+        *sustain* 0
+        *release* 0
+        *sin* 1
+        *sawtooth* 0
+        *square* 1/4
+        *triangle* 1/4
+        *noise* 1/4)
+  (save-notes (- 3 24) (+ 3 24)))
 
 #+nil
 (progn
