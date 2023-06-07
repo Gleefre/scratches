@@ -514,6 +514,16 @@
 (defun current-key-down-p (code)
   (not (kit.sdl2:key-down-p *tracker* code)))
 
+(setf *attack* 0
+      *decay* 1/10
+      *sustain* 0
+      *release* 0
+      *sin* 1
+      *sawtooth* 0
+      *square* 1/4
+      *triangle* 1/4
+      *noise* 1/4)
+
 (progn
   (h-restart)
   (make-ontes -21 8)
@@ -524,7 +534,7 @@
 
 (ql:quickload :cl-mixed-wav)
 
-(defun save-note (k &key (encoding :float))
+(defun save-note (k &key (encoding :uint8))
   (let ((file (note-file k)))
     (mixed:with-objects ((note (make-instance 'fun-generator
                                               :function 'fg-try
@@ -546,21 +556,13 @@
                 do (mixed:mix chain))
           (format T "Wrote ~d frames." (mixed:frame-position out)))))))
 
-(defun save-notes (from to)
+(defun save-notes (from to &rest args &key encoding)
+  (declare (ignorable encoding))
   (loop for k from from to to
-        do (save-note k)))
+        do (apply #'save-note k args)))
 
-(progn
-  (setf *attack* 0
-        *decay* 1/10
-        *sustain* 0
-        *release* 0
-        *sin* 1
-        *sawtooth* 0
-        *square* 1/4
-        *triangle* 1/4
-        *noise* 1/4)
-  (save-notes (- 3 24) (+ 3 24)))
+#+nil
+(save-notes (- 3 24) (+ 3 24) :encoding :int16)
 
 #+nil
 (progn
