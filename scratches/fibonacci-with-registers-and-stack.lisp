@@ -56,24 +56,12 @@
       (the fixnum (+ (the fixnum (fib (the fixnum (- n 1))))
                      (the fixnum (fib (the fixnum (- n 2))))))))
 
+(compile 'fib-iter)
+(compile 'fib)
+
+(time (fib-iter 40))
+(time (fib 40))
+
 #|
-;;;; SBCL 2.3.6
-CL-USER> (time (fib 40))                ;
-Evaluation took:
-  0.628 seconds of real time
-  0.626593 seconds of total run time (0.626593 user, 0.000000 system)
-  99.84% CPU
-  1,688,661,189 processor cycles
-  0 bytes consed
 
-102334155
-CL-USER> (time (fib-iter 40))
-Evaluation took:
-  0.372 seconds of real time
-  0.374779 seconds of total run time (0.374769 user, 0.000010 system)
-  100.81% CPU
-  1,010,004,417 processor cycles
-  0 bytes consed
-
-102334155
 |#
