@@ -66,8 +66,8 @@
                       (setf (mixed:repeat-mode rep-r) *mode*
                             (mixed:repeat-mode rep-l) *mode*)))
                    (if (eq *mode* :play)
-                       (setf (mixed:volume output) 1)
-                       (setf (mixed:volume output) 0)))
+                       (setf (mixed:volume output) 1f0)
+                       (setf (mixed:volume output) 0f0)))
                  (mixed:mix chain))))))
 
 (start)
