@@ -135,10 +135,10 @@
       (case (sdl2:scancode keysym)
         (:scancode-r (setf view-x 0 view-y 0
                            player-x (floor +width+ 2) player-y (floor +height+ 2)))
-        (:scancode-w (decf player-y) (setf player-dir :n))
-        (:scancode-s (incf player-y) (setf player-dir :s))
-        (:scancode-a (decf player-x) (setf player-dir :w))
-        (:scancode-d (incf player-x) (setf player-dir :e))
+        ((:scancode-up :scancode-w) (decf player-y) (setf player-dir :n))
+        ((:scancode-down :scancode-s) (incf player-y) (setf player-dir :s))
+        ((:scancode-left :scancode-a) (decf player-x) (setf player-dir :w))
+        ((:scancode-right :scancode-d) (incf player-x) (setf player-dir :e))
         (t (if (zerop (random 2))
                (incf player-x (random-between -1 1))
                (incf player-y (random-between -1 1)))))
@@ -165,4 +165,4 @@
             (setf (gethash node-id (gethash mp *maps*))
                   (remove :platform (gethash node-id (gethash mp *maps*)))))))))
 
-(make-instance 'little-mover :scale 5)
+(make-instance 'little-mover :scale 5 :resizable t)
