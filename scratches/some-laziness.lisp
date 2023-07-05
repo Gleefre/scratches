@@ -1,77 +1,138 @@
-(defmacro cons/lazy (head tail)
-  `(cons
-    (λ () ,head)
-    (λ () ,tail)))
+(defstruct (delay (:constructor make-delay (function))) (function))
 
-(defun head (lazy)
-  (funcall (car lazy)))
+(defun delay-call (thing)
+  (if (delay-p thing)
+      (funcall (delay-function thing))
+      thing))
 
-(defun tail (lazy)
-  (funcall (cdr lazy)))
+(defmacro delay (&body body)
+  `(make-delay (λ () ,@body)))
 
-(defun enum/lazy (a b step)
-  (if (> a b)
-      nil
-      (cons/lazy a (enum/lazy (+ a step) b step))))
+(define-modify-macro force () delay-call)
 
-(defun force/lazy (lazy)
-  (if lazy
-      (cons (head lazy)
-            (force/lazy (tail lazy)))))
+(defmacro lazy-cons (head tail)
+  `(cons (delay ,head)
+         (delay ,tail)))
 
-(defun append/lazy (one another)
+(defun lazy-head (lazy-seq)
+  (force (car lazy-seq)))
+
+(defun lazy-tail (lazy-seq)
+  (force (cdr lazy-seq)))
+
+(defun force-tree (lazy-tree &optional max-depth)
+  (labels ((force-tree/rec (thing depth)
+             (when (and (consp thing)
+                        (not (zerop depth)))
+               (force-tree/rec (lazy-head thing) (1- depth))
+               (force-tree/rec (lazy-tail thing) (1- depth)))
+             (values)))
+    (force-tree/rec lazy-tree (or max-depth -1)))
+  lazy-tree)
+
+(defun force-seq (lazy-seq &optional max-depth)
+  (labels ((force-seq/iter (thing depth)
+             (when (and (consp thing)
+                        (not (zerop depth)))
+               (lazy-head thing)
+               (force-seq/iter (lazy-tail thing) (1- depth)))))
+    (force-seq/iter lazy-seq (or max-depth -1)))
+  lazy-seq)
+
+(defun lazy-range-infinite (a step)
+  (lazy-cons a (lazy-range-infinite (+ a step) step)))
+
+(defun lazy-range-up (a b step)
+  (when (<= a b)
+    (lazy-cons a (lazy-range-up (+ a step) b step))))
+
+(defun lazy-range-down (a b step)
+  (when (>= a b)
+    (lazy-cons a (lazy-range-down (+ a step) b step))))
+
+(defun lazy-range-repeat (a)
+  (lazy-cons a (lazy-range-repeat a)))
+
+(defun lazy-range (a b &optional (step 1))
+  (cond ((not b) (lazy-range-infinite a step))
+        ((plusp step) (lazy-range-up a b step))
+        ((minusp step) (lazy-range-down a b step))
+        ((zerop step) (lazy-range-repeat a))))
+
+(defun lazy-append (one another)
   (if one
-      (cons/lazy (head one)
-                 (append/lazy (tail one) another))
+      (lazy-cons (lazy-head one)
+                 (lazy-append (lazy-tail one) another))
       another))
 
-(defun traverse/lazy (tree)
+(defun lazy-flatten (tree)
   (if (consp tree)
-      (append/lazy (traverse/lazy (car tree))
-                   (traverse/lazy (cdr tree)))
-      (cons/lazy tree nil)))
+      (lazy-append (lazy-flatten (car tree))
+                   (lazy-flatten (cdr tree)))
+      (lazy-cons tree nil)))
 
-(defun map/lazy (lazy function)
-  (if lazy
-      (cons/lazy (funcall function (head lazy))
-                 (map/lazy (tail lazy) function))))
+(defun lazy-map (function lazy-seq &rest lazy-seqs)
+  (when (every (λ (l) (and l (consp l)))
+               (list* lazy-seq lazy-seqs))
+    (lazy-cons (apply function (lazy-head lazy-seq) (mapcar #'lazy-head lazy-seqs))
+               (apply #'lazy-map function (lazy-tail lazy-seq) (mapcar #'lazy-tail lazy-seqs)))))
 
-(defun filter/lazy (lazy predicate)
-  (if lazy
-      (if (funcall predicate (head lazy))
-          (cons/lazy (head lazy)
-                     (filter/lazy (tail lazy) predicate))
-          (filter/lazy (tail lazy) predicate))))
+(defun lazy-remove-if (predicate lazy-seq)
+  (when lazy-seq
+    (if (funcall predicate (lazy-head lazy-seq))
+        (lazy-remove-if predicate (lazy-tail lazy-seq))
+        (lazy-cons (lazy-head lazy-seq)
+                   (lazy-remove-if predicate (lazy-tail lazy-seq))))))
 
-(defun reduce/lazy (lazy function initial-value)
-  (if lazy
-      (funcall function
-               (head lazy)
-               (reduce/lazy (tail lazy) function initial-value))
-      initial-value))
+(defun lazy-remove-if-not (predicate lazy-seq)
+  (when lazy-seq
+    (if (funcall predicate (lazy-head lazy-seq))
+        (lazy-cons (lazy-head lazy-seq)
+                   (lazy-remove-if-not predicate (lazy-tail lazy-seq)))
+        (lazy-remove-if-not predicate (lazy-tail lazy-seq)))))
 
-(defun flatten/lazy (lazy-lazy)
-  (reduce/lazy lazy-lazy #'append/lazy nil))
+(defun lazy-remove (item lazy-seq &key (test #'eql))
+  (lazy-remove-if (λ (x) (funcall test item x)) lazy-seq))
 
-(defun queen/lazy (n)
-  (labels ((queen/good (i conf)
-             (loop for r from 1
-                   for j in conf
-                   never (= i j)
-                   never (= r (- j i))
-                   never (= r (- i j))))
-           (queen/rec (k)
+(defun lazy-reduce (function lazy-seq &optional (initial-value (funcall function)))
+  (labels ((lazy-reduce/iter (seq acc)
+             (if seq
+                 (lazy-reduce/iter (lazy-tail seq)
+                                   (funcall function (lazy-head seq) acc))
+                 acc)))
+    (lazy-reduce/iter lazy-seq initial-value)))
+
+(defun lazy-merge (lazy-lazy)
+  (lazy-reduce #'lazy-append lazy-lazy nil))
+
+(defun queen-n/lazy (n)
+  (labels ((rec (k)
              (if (= k 1)
-                 (map/lazy (enum/lazy 1 n 1)
-                           (λ (x) (list x)))
-                 (flatten/lazy
-                  (map/lazy (queen/rec (1- k))
-                            (λ (conf)
-                               (map/lazy
-                                (filter/lazy
-                                 (enum/lazy 1 n 1)
-                                 (λ (i)
-                                    (queen/good i conf)))
-                                (λ (i)
-                                   (list* i conf)))))))))
-    (queen/rec n)))
+                 (lazy-map #'list (lazy-range 1 n))
+                 (lazy-merge
+                  (lazy-map (λ (conf)
+                               (flet ((good (i)
+                                        (loop for r from 1
+                                              for j in conf
+                                              never (= i j)
+                                              never (= r (- j i))
+                                              never (= r (- i j)))))
+                                 (lazy-map (λ (i) (list* i conf))
+                                           (lazy-remove-if-not #'good (lazy-range 1 n)))))
+                            (rec (1- k)))))))
+    (rec n)))
+
+(defun lazy-sieve (seq)
+  (let ((p (lazy-head seq)))
+    (lazy-cons p (lazy-sieve
+                  (lazy-remove-if (λ (x) (zerop (mod x p)))
+                                  (lazy-tail seq))))))
+
+(defun lazy-primes ()
+  (lazy-sieve (lazy-range 2 nil)))
+
+(defvar *ones*)
+(defparameter *ones* (lazy-cons 1 *ones*))
+
+(defvar *integers*)
+(defparameter *integers* (lazy-cons 1 (lazy-map #'+ *ones* *integers*)))
