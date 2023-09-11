@@ -1,4 +1,9 @@
-(use-package (ql:quickload :sketch))
+(ql:quickload :sketch)
+
+(defpackage #:sketch-user
+  (:use #:cl #:sketch))
+
+(in-package #:sketch-user)
 
 (defsketch bob-1 ((copy-pixels t))
   (point 0 0))

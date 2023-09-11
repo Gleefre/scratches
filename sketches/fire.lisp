@@ -1,5 +1,9 @@
-(require '#:sketch)
-(use-package '#:sketch)
+(ql:quickload :sketch)
+
+(defpackage #:fire
+  (:use #:cl #:sketch))
+
+(in-package #:fire)
 
 (defparameter *width* 100)
 (defparameter *height* 100)

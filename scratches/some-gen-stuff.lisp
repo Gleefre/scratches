@@ -1,4 +1,6 @@
-(in-package #:cl-user)
+(defpackage #:gr.synthy
+  (:use #:cl #:sb-ext))
+(in-package #:gr.synthy)
 
 (ql:quickload '(:harmony :cl-mixed :sketch :stopclock :sketch-fit))
 
