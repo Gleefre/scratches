@@ -57,8 +57,8 @@
     c))
 
 (progn
-  (defparameter *w* 600)
-  (defparameter *h* 800)
+  (defparameter *w* 900)
+  (defparameter *h* 1200)
   (defparameter *wh-arr* (make-array (* *w* *h*) :element-type 'list :initial-element NIL))
   (let ((i -1))
     (dotimes (x *w*)

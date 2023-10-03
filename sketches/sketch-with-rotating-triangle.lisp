@@ -46,7 +46,7 @@
                                (ceiling (reduce #'max flat-triangle :key #'d-p-y)))
           do (loop for pixel-x from minimal-x to maximal-x
                    do (loop for pixel-y from minimal-y to maximal-y
-                            for point-depth = (triangle-contains flat-triangle (v:vec2 pixel-x pixel-y))
+                            for point-depth = (triangle-point-depth-p flat-triangle (v:vec2 pixel-x pixel-y))
                             when (and point-depth
                                       (or (eq (aref depths pixel-x pixel-y) :infinity)
                                           (< point-depth (aref depths pixel-x pixel-y))))

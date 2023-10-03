@@ -131,8 +131,16 @@
 (defun lazy-primes ()
   (lazy-sieve (lazy-range 2 nil)))
 
+(defmacro lazy-list* (one &rest others)
+  (if (null others)
+      one
+      `(lazy-cons ,one (lazy-list* ,@others))))
+
 (defvar *ones*)
 (defparameter *ones* (lazy-cons 1 *ones*))
 
 (defvar *integers*)
 (defparameter *integers* (lazy-cons 1 (lazy-map #'+ *ones* *integers*)))
+
+(defvar *fibs*)
+(defparameter *fibs* (lazy-list* 0 1 (lazy-map #'+ *fibs* (lazy-tail *fibs*))))

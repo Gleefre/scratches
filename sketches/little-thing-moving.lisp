@@ -63,8 +63,8 @@
       (image (load-resource "player.png") 2 2))))
 
 (defsketch little-mover ((scale 1)
-                         (width (* scale +width+ +node-side+))
-                         (height (* scale +height+ +node-side+))
+                         (width (* 3 +width+ +node-side+))
+                         (height (* 3 +height+ +node-side+))
                          (mp :start-room)
                          (view-x 0)
                          (view-y 0)
