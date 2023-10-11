@@ -18,3 +18,22 @@
                                                                  collect outer)))
                                      ,@body))))
        ,@body)))
+
+
+(defmacro p-macrolet (definitions transfer-macros &body body
+                      &environment env)
+  (let ((transfers (alexandria:make-gensym-list (length transfer-macros))))
+    `(macrolet (,@(loop for macro in transfer-macros
+                        for tmacro in transfers
+                        collect `(,tmacro (&whole whole &rest args &environment env)
+                                          (declare (ignore args))
+                                          (funcall ,(macro-function macro env) whole env)))
+                ,@(loop for (name arglist . body) in definitions
+                        collect `(,name ,arglist
+                                   `(macrolet ,',(loop for macro in transfer-macros
+                                                       for tmacro in transfers
+                                                       collect `(,macro (&rest args)
+                                                                  `(,',tmacro ,@args)))
+                                      ,(progn ,@body)))))
+       ,@body)))
+
