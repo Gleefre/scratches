@@ -37,3 +37,16 @@
                                       ,(progn ,@body)))))
        ,@body)))
 
+
+(defmacro mlet ((name lambda-list &body body) &body mlet-body
+                &environment env)
+  (let ((transfer (gensym "MLET-TRANSFER")))
+    `(macrolet ((,transfer (&rest args &environment env)
+                  (funcall ,(macro-function name env)
+                           `(,',name ,@args)
+                           env))
+                (,name ,lambda-list
+                  `(macrolet ((,',name (&rest args)
+                                `(,',',transfer ,@args)))
+                     ,(progn ,@body))))
+       ,@mlet-body)))
