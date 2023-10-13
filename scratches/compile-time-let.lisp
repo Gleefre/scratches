@@ -53,7 +53,7 @@
                                collect `(,name (compile-time ,name))))
        ,@body)))
 
-
+#|
 ;; WRONG!
 (defun foo ()
   (compile-time-let ((x 10))
@@ -64,3 +64,4 @@
   (compile-time-let ((x 0))
     (macrolet ((foo () (incf x)))
       (foo))))
+|#
