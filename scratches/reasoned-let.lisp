@@ -1,3 +1,6 @@
+(defun ensure-list (thing)
+  (if (listp thing) thing (list thing)))
+
 ;; One more utility
 
 (defmacro with-lexenv ((var) &body body)
@@ -11,7 +14,7 @@
 (defun build-lets (bindings body-var &optional previous)
   (if bindings
       (destructuring-bind (name &optional value (reason :unknown))
-          (alexandria:ensure-list (car bindings))
+          (ensure-list (car bindings))
         `(let ((,name (with-reasoning (,name ,reason ,@previous)
                         ,value)))
            ,(build-lets (cdr bindings) body-var (list* name previous))))
