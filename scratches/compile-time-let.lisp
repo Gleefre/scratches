@@ -71,3 +71,20 @@
     (macrolet ((foo () (incf x)))
       (foo))))
 |#
+
+
+#|
+(defmacro expanding (&whole form &body body)
+  `(compile-time-let ((parent-form ',form))
+     ,@body))
+
+(defmacro foo ()
+  `(at-compile-time ()
+     (format t "Expanding FOO from ~A~%" parent-form)
+     `(+ 1 2)))
+
+(expanding
+  (- (foo)))
+; >> Expanding FOO from (EXPANDING (- (FOO)))
+; => -3
+|#
