@@ -39,7 +39,7 @@
                     `(let ((table ',,g!rtable))
                        ,@',body)))
          (with-lexenv (env)
-           (let ((lets (tma:macroexpand-all
+           (let ((lets (trivial-macroexpand-all:macroexpand-all
                         ',(build-lets bindings g!body)
                         env)))
              `(symbol-macrolet ((,',g!body (body-with-runtime-reasoning)))
