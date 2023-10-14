@@ -53,6 +53,12 @@
                                collect `(,name (compile-time ,name))))
        ,@body)))
 
+(defmacro at-compile-time ((&optional env) &body body)
+  (let ((capture (gensym)))
+    `(macrolet ((,capture (,@(when env `(&environment ,env)))
+                  ,@body))
+       (,capture))))
+
 #|
 ;; WRONG!
 (defun foo ()
