@@ -1,3 +1,6 @@
+(defpackage #:%flocon (:use #:cl))
+(in-package #:%flocon)
+
 (ql:quickload :sketch)
 (use-package :sketch)
 
