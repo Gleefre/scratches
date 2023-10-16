@@ -1,3 +1,6 @@
+(defpackage #:%mb (:use #:cl))
+(in-package #:%mb)
+
 (use-package (ql:quickload :sketch))
 (use-package (ql:quickload :sketch-fit))
 
