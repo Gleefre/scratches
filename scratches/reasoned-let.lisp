@@ -9,6 +9,46 @@
                   ,@body))
        (,g!body))))
 
+(ql:quickload :trivial-macroexpand-all)
+
+(defun form-depends-on-p (vars form &optional env)
+  (let ((bindings (loop for var in vars collect `(,(gensym) ,var)))
+        (g!reason (gensym))
+        (deps ()))
+    (flet ((reason (var)
+             (pushnew var deps)))
+      (trivial-macroexpand-all:macroexpand-all
+       `(let (,@bindings)
+          (macrolet ((,g!reason (var g!var)
+                       (funcall ,#'reason var)
+                       g!var))
+            (symbol-macrolet (,@(loop for (g!var var) in bindings
+                                      collect `(,var (,g!reason ,var ,g!var))))
+              ,form)))
+       env))
+    deps))
+
+(form-depends-on-p '(x y z) '(+ a b x y))
+
+
+
+(defmacro form-depends-on-p (vars form)
+  (let ((bindings (loop for var in vars collect `(,(gensym) ,var)))
+        (g!reason (gensym)))
+    `(compile-time-let (deps)
+       (at-compile-time (env)
+         (let ((expanded (trivial-macroexpand-all:macroexpand-all
+                          `(let (,@',bindings)
+                             (macrolet ((,',g!reason (var g!var)
+                                          (pushnew var deps)
+                                          g!var))
+                               (symbol-macrolet (,@',(loop for (g!var var) in bindings
+                                                           collect `(,var (,g!reason ,var ,g!var))))
+                                 ,',form)))
+                          env)))
+           `(values ',deps
+                    ',expanded))))))
+
 ;; reasoned-let*, compile time
 
 (defun build-lets (bindings body-var &optional previous)
