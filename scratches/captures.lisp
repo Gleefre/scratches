@@ -146,7 +146,7 @@
 
 (defmacro flet/capture ((&rest definitions) &body body)
   (let (functions macros)
-    (loop for (name lambda-list body) in definitions
+    (loop for (name lambda-list . body) in definitions
           do (multiple-value-bind (macro function)
                  (parse-capture name lambda-list body)
                (push macro macros)
@@ -157,7 +157,7 @@
 
 (defmacro labels/capture ((&rest definitions) &body body)
   (let (functions macros)
-    (loop for (name lambda-list body) in definitions
+    (loop for (name lambda-list . body) in definitions
           do (multiple-value-bind (macro function)
                  (parse-capture name lambda-list body)
                (push macro macros)
