@@ -121,7 +121,7 @@
     (draw-scene particles)
     (with-font (make-font :size 60)
       (sketch-utils:with-fit (600 600 100 100)
-        (text (format nil "FPS ~$" (funcall fps-counter :report))
+        (text (format nil "FPS ~$  Particles: ~A" (funcall fps-counter :report) (length particles))
               5
               -10)))))
 
