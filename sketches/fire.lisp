@@ -75,12 +75,38 @@
   (with-pen (make-pen :fill (lerp-color +magenta+ +white+ 4/5))
     (polygon 50 0 35 30 37 35 63 35 66 30)))
 
+(defun make-fps-counter (&aux (n 100))
+  (let* ((count 1)
+         (clock (sc:make-clock))
+         (frame-queue (list :queue 0))
+         (frame-queue-end (cdr frame-queue)))
+    (flet ((qpush (val)
+             (setf (cdr frame-queue-end) (list val)
+                   frame-queue-end (cdr frame-queue-end)))
+           (qpop ()
+             (unless (eq frame-queue frame-queue-end)
+               (pop frame-queue)))
+           (qfirst ()
+             (cadr frame-queue))
+           (qlast ()
+             (car frame-queue-end)))
+      (lambda (action)
+        (case action
+          (:bump
+           (incf count)
+           (qpush (sc:time clock))
+           (when (> count n) (qpop)))
+          (:report
+           (/ (min count n)
+              (- (qlast) (qfirst)))))))))
+
 (defsketch fire ((particles ())
                  (width 800) (height 800)
                  (title "Torch")
                  (time 0)
-                 (clock (sc:make-clock))
+                 (fps-counter (make-fps-counter))
                  (y-axis t))
+  (funcall fps-counter :bump)
   (incf time)
   (when (= (mod time 3) 0)
     (dolist (p particles)
@@ -95,7 +121,7 @@
     (draw-scene particles)
     (with-font (make-font :size 60)
       (sketch-utils:with-fit (600 600 100 100)
-        (text (format nil "FPS ~$" (/ time (sc:time clock)))
+        (text (format nil "FPS ~$" (funcall fps-counter :report))
               5
               -10)))))
 
