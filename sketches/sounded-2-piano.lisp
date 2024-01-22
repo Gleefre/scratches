@@ -20,7 +20,7 @@
     (#\. . 55) (#\/ . 56) (#\' . 52)))
 
 (defparameter *note-shift* -19)
-(defparameter *notes-folder* "/home/grolter/portacle/piano_c4/")
+(defparameter *notes-folder* "/home/grolter/mydata/good-root/projects/lisp/lispiano/piano_c4/")
 
 (defun on-start ()
   (sdl2-mixer:init :wave)
@@ -100,7 +100,8 @@
         (pushnew note (slot-value app 'pressed-notes))
         (setf (slot-value app 'pressed-notes)
               (remove note (slot-value app 'pressed-notes) :test #'equal))))
-  (kit.sdl2:render app))
+  (unless (eq (sdl2:scancode keysym) :scancode-escape)
+    (kit.sdl2:render app)))
 
 (defparameter *stop?* nil)
 
@@ -110,9 +111,12 @@
   (setf *stop?* t))
 
 (defun main ()
-  (let ((app (make-instance 'key-piano :fullscreen nil)))
+  (let ((app (make-instance 'key-piano :fullscreen nil))
+        (*stop?* nil))
     (setf (kit.sdl2:idle-render app) nil)
     (kit.sdl2:render app)
     (loop until *stop?* do (sleep 1))))
 
 (sb-ext:save-lisp-and-die "out.bin" :toplevel #'main :executable t :purify t)
+
+(main)

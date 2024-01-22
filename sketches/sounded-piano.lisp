@@ -18,7 +18,7 @@
     (#\. . 55) (#\/ . 56) (#\' . 52)))
 
 (defparameter *note-shift* -20)
-(defparameter *notes-folder* "~/portacle/piano_c4/")
+(defparameter *notes-folder* "/home/grolter/mydata/good-root/projects/lisp/lispiano/piano_c4/")
 
 (defun note-filename (note-index)
   (format nil "~a~a.wav"
@@ -88,7 +88,8 @@
         (pushnew note (slot-value app 'pressed-notes))
         (setf (slot-value app 'pressed-notes)
               (remove note (slot-value app 'pressed-notes) :test #'equal))))
-  (kit.sdl2:render app))
+  (unless (eq (sdl2:scancode keysym) :scancode-escape)
+    (kit.sdl2:render app)))
 
 (defmethod kit.sdl2:close-window :before ((app key-piano))
   (loop for (_ . note) in (slot-value app 'notes)

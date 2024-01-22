@@ -15,7 +15,7 @@
 
 ;; move stuff to a separate function
 ;; so that internal clock is not reset on update
-(Defun draw (clock w h)
+(defun draw (clock w h)
   ;; Lets scale our sketch to fit into w x h
   ;; window
   ;; w -> 200

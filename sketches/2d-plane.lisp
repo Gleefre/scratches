@@ -16,7 +16,7 @@
 
 (defsketch game ((entered nil)
                  (x 0) (y 0))
-  (fit 100 150 sketch::instance)
+  (fit 100 150 sketch::*sketch*)
   (rect 0 0 100 150)
   (when entered
     (circle 20 20 40)))
@@ -29,10 +29,7 @@
         (:enter (setf entered t))
         (:leave (setf entered nil))))))
 
-(defparameter *a* (make-instance 'game))
-
-(let ((wind (kit.sdl2:sdl-window *a*)))
-  (sdl2::sdl-set-window-resizable wind t))
+(defparameter *a* (make-instance 'game :resizable t))
 
 (defsketch okno ((x 0) (y 0) (data (loop repeat 100 collect (cons (random 1500) (random 1000)))))
   (translate (- x) (- y))

@@ -19,7 +19,7 @@
   (rotate angle 64 64)
   (translate x y)
   (with-pen (make-pen)
-    (image (load-resource "/home/grolter/arts/walker128.png") 0 0))
+    (image (load-resource "/home/grolter/good-root/arts/pics/drawings/little-thing-512.png") 0 0))
   (circle 64 64 4))
 
 (defparameter *last-keysym* nil)

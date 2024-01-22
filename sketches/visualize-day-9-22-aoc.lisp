@@ -10,7 +10,8 @@
                                 (gethash (car (last rope)) visited?) t)
                        collect rope))))
 
-(defparameter *a* (day-9+))
+(aoc/interface:with-test-case (:test)
+  (defparameter *a* (day-9+)))
 
 (defparameter *dx* (- (apply #'min (mapcan (lambda (head) (mapcar #'first head)) *a*))))
 (defparameter *dy* (- (apply #'min (mapcan (lambda (head) (mapcar #'second head)) *a*))))
@@ -58,3 +59,5 @@
         (:scancode-s (decf current-rope 100))
         (:scancode-z (incf current-rope 500))
         (:scancode-x (decf current-rope 500))))))
+
+(make-instance 'visualize)

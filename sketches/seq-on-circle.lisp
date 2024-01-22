@@ -2,6 +2,8 @@
   (ql:quickload :sketch)
   (ql:quickload :computable-reals))
 
+(ql:quickload :sketch-utils)
+
 (defpackage #:sketch-user
   (:use #:cl #:sketch)
   (:local-nicknames (#:sc #:stopclock)))
@@ -72,8 +74,7 @@
            (incf count))
   (with-pen (make-pen :stroke +white+)
     (background +black+)
-    (with-fit (((* 2 +sf+) (* 2 +sf+) (- +sf+) (- +sf+))
-               (width height))
+    (sketch-utils::with-fit ((* 2 +sf+) (* 2 +sf+) width height (- +sf+) (- +sf+))
       (circle 0 0 +sf+)
       (loop for ((x y) (x* y*)) on points
             repeat count

@@ -4,16 +4,16 @@
 (use-package (ql:quickload :sketch))
 (use-package (ql:quickload :sketch-fit))
 
-(defun draw-pat-lines (c steps scale)
-  (loop for z = c then (+ (* z z) c)
+(defun draw-pat-lines (c d steps scale)
+  (loop for z = d then (+ (* z z) c)
         and prev-z = 0 then z
         repeat steps
         while (> (* 2 scale) (max (abs (realpart z)) (abs (imagpart z))))
         do (line (* scale (realpart prev-z)) (* scale (imagpart prev-z))
                  (* scale (realpart z)) (* scale (imagpart z)))))
 
-(defun draw-pat-points (c steps scale)
-  (loop for z = 0 then (+ (* z z) c)
+(defun draw-pat-points (c d steps scale)
+  (loop for z = d then (+ (* z z) c)
         repeat (1+ steps)
         while (> (* 2 scale) (max (abs (realpart z)) (abs (imagpart z))))
         do (circle (* scale (realpart z)) (* scale (imagpart z)) 4)))
@@ -70,10 +70,13 @@
               (cons x y)))))
 
   (defsketch z^2+c ((mouse-x 200) (mouse-y 200) (steps 10) (scale-rate 5)
+                    (func-x mouse-x) (func-y mouse-y)
                     (canv nil) (gtime nil) (redraw? t))
     (let ((scale (/ (min width height) scale-rate))
-          (c* (z-from-mouse width height mouse-x mouse-y scale-rate)))
+          (d* (z-from-mouse width height mouse-x mouse-y scale-rate))
+          (c* (z-from-mouse width height func-x func-y scale-rate)))
       (unless (and canv (not redraw?))
+        (setf func-x mouse-x func-y mouse-y)
         (let ((start (get-internal-real-time))
               (c (make-mad c*
                            (float (/ width -2 scale))
@@ -83,8 +86,10 @@
                            *w* *h* *wh-arr*))
               (end (get-internal-real-time)))
           (canvas-lock c)
-          (setf canv c                  ;redraw? nil
-                gtime (/ (- end start) internal-time-units-per-second))))
+          (setf canv c
+                gtime (/ (- end start) internal-time-units-per-second))
+          (when (eq redraw? :once)
+            (setf redraw? nil))))
       (with-pen (make-pen :fill (canvas-image canv))
         (rect 0 0 width height))
       (with-font (make-font :color +white+)
@@ -93,10 +98,10 @@
               0 0))
       (translate (/ width 2) (/ height 2))
       (with-pen (make-pen :fill +cyan+)
-        (draw-pat-points c* steps scale))
+        (draw-pat-points c* d* steps scale))
       (with-pen (make-pen :stroke +magenta+)
         (circle 0 0 scale)
-        (draw-pat-lines c* steps scale)))))
+        (draw-pat-lines c* d* steps scale)))))
 
 (defun run (&rest args)
   (apply #'make-instance 'z^2+c :resizable t args))
@@ -114,6 +119,7 @@
         (:scancode-x (decf scale-rate))
         (:scancode-q (incf steps))
         (:scancode-e (decf steps))
-        (:scancode-r (setf redraw? t))))))
+        (:scancode-r (setf redraw? (or redraw? :once)))
+        (:scancode-space (setf redraw? (not redraw?)))))))
 
 (run)

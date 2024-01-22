@@ -60,7 +60,7 @@
         (:e (circle 10 5 1))))
     (scale 1/2)
     (with-pen (make-pen)
-      (image (load-resource "player.png") 2 2))))
+      (image (load-resource "/home/grolter/good-root/lisp/scratches/sketches/player.png") 2 2))))
 
 (defsketch little-mover ((scale 1)
                          (width (* 3 +width+ +node-side+))

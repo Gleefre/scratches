@@ -35,6 +35,8 @@
 
 (defparameter *apple* (make-instance 'apple))
 
+(defparameter *last-apple* nil)
+
 (defun eat-apple ()
   (with-slots (x y) *apple*
     (incf x (+ 150 (random 100)))
@@ -53,18 +55,26 @@
                     2)))
      20))
 
-(defparameter *last-apple* nil)
-
 (defun draw-apple ()
   (when (collide?) (eat-apple))
   (with-pen (make-pen)
-    (image (load-resource "/home/grolter/mydata/arts/apple-240.png")
+    (image (load-resource "/home/grolter/good-root/arts/pics/kritas/apple-240.png")
            (- (apple-x *apple*) 8) (- (apple-y *apple*) 8)
            16 16)))
 
 (defun current-angle ()
   (+ *last-angle*
      (* *moving* *dir* 360 (time-from *last-press* *rotation-period*))))
+
+(defun sciss (x y w h)
+  (destructuring-bind ((x1 y1) (x2 y2))
+      (list
+       (sketch::transform-vertex (list x (+ y h)) (sketch::env-model-matrix sketch::*env*))
+       (sketch::transform-vertex (list (+ x w) y) (sketch::env-model-matrix sketch::*env*)))
+    (let* ((height (sketch::sketch-height sketch::*sketch*))
+           (y1 (- height y1))
+           (y2 (- height y2)))
+      (gl:scissor x1 y1 (- x2 x1) (- y2 y1)))))
 
 (defun draw-mover (w h)
   (gl:enable :scissor-test)
@@ -85,19 +95,12 @@
                           (rotate angle)
                           (with-pen (make-pen)
                             (rotate 90)
-                            (image (load-resource "/home/grolter/mydata/arts/turtlish-200.png")
+                            (image (load-resource "/home/grolter/good-root/arts/pics/kritas/turtlish-200.png")
                                    -20 -20 40 40)))))))
   (gl:disable :scissor-test))
 
-(defun sciss (x y w h)
-  (destructuring-bind ((x1 y1) (x2 y2))
-      (list
-       (sketch::transform-vertex (list x (+ y h)) (sketch::env-model-matrix sketch::*env*))
-       (sketch::transform-vertex (list (+ x w) y) (sketch::env-model-matrix sketch::*env*)))
-    (let* ((height (sketch::sketch-height sketch::*sketch*))
-           (y1 (- height y1))
-           (y2 (- height y2)))
-      (gl:scissor x1 y1 (- x2 x1) (- y2 y1)))))
+(defparameter *last-click* (- (get-internal-real-time) internal-time-units-per-second))
+(defparameter *last-double-click* (- (get-internal-real-time) internal-time-units-per-second))
 
 (defun draw-pause ()
   (when (zerop *moving*)
@@ -110,52 +113,6 @@
       (with-pen (make-pen :fill (gray 0.9 0.7))
         (rect 50 -100 50 200)
         (rect -100 -100 50 200)))))
-
-(defsketch 1b ((title "WIP - no idea yet"))
-  (background +black+)
-  (fit 440 480 width height)
-  (draw-stars)
-  (with-font (make-font :color (gray 0.6) :align :center :size 40)
-    (text (format nil "Score: ~a" *score*) 220 0))
-  (with-current-matrix (translate 20 60)
-    (with-pen (make-pen :stroke (gray 0.4) :weight 4)
-      (rect 0 0 400 400))
-    (draw-apple)
-    (draw-mover 400 400))
-  (draw-pause))
-
-(defun start ()
-  (make-instance '1b :resizable t))
-
-(defun hold-down (app)
-  (setf *last-angle* (current-angle))
-  (setf *last-press* (get-internal-real-time))
-  (setf *dir* -1))
-
-(defun hold-up (app)
-  (setf *last-angle* (current-angle))
-  (setf *last-press* (get-internal-real-time))
-  (setf *dir* 1))
-
-(defun double-click (app)
-  (setf *last-angle* (current-angle))
-  (setf *last-double-click* (get-internal-real-time))
-  (setf *last-press* (get-internal-real-time))
-  (setf *moving* (- 1 *moving*)))
-
-(defparameter *last-click* (- (get-internal-real-time) internal-time-units-per-second))
-(defparameter *last-double-click* (- (get-internal-real-time) internal-time-units-per-second))
-
-(defmethod kit.sdl2:keyboard-event ((app 1b) st ts rep? keysym)
-  (when (and (not rep?)
-             (eq (sdl2:scancode keysym) :scancode-space))
-    (when (eq st :keydown)
-      (when (< (time-from *last-click* 1/3) 1)
-        (double-click app))
-      (setf *last-click* (get-internal-real-time)))
-    (case st
-      (:keydown (hold-down app))
-      (:keyup (hold-up app)))))
 
 ;; from sketch-stars
 
@@ -205,5 +162,51 @@
     (setf *positions* (rotate-list *positions*))
     (setf *stars* (rotate-list *stars*))
     (setf *direction-shift* (- 1 *direction-shift*))))
+
+(defsketch 1b ((title "WIP - no idea yet"))
+  (background +black+)
+  (fit 440 480 width height)
+  (draw-stars)
+  (with-font (make-font :color (gray 0.6) :align :center :size 40)
+    (text (format nil "Score: ~a" *score*) 220 0))
+  (with-current-matrix (translate 20 60)
+    (with-pen (make-pen :stroke (gray 0.4) :weight 4)
+      (rect 0 0 400 400))
+    (draw-apple)
+    (draw-mover 400 400))
+  (draw-pause))
+
+(defun start ()
+  (make-instance '1b :resizable t))
+
+(defun hold-down (app)
+  (declare (ignorable app))
+  (setf *last-angle* (current-angle))
+  (setf *last-press* (get-internal-real-time))
+  (setf *dir* -1))
+
+(defun hold-up (app)
+  (declare (ignorable app))
+  (setf *last-angle* (current-angle))
+  (setf *last-press* (get-internal-real-time))
+  (setf *dir* 1))
+
+(defun double-click (app)
+  (declare (ignorable app))
+  (setf *last-angle* (current-angle))
+  (setf *last-double-click* (get-internal-real-time))
+  (setf *last-press* (get-internal-real-time))
+  (setf *moving* (- 1 *moving*)))
+
+(defmethod kit.sdl2:keyboard-event ((app 1b) st ts rep? keysym)
+  (when (and (not rep?)
+             (eq (sdl2:scancode keysym) :scancode-space))
+    (when (eq st :keydown)
+      (when (< (time-from *last-click* 1/3) 1)
+        (double-click app))
+      (setf *last-click* (get-internal-real-time)))
+    (case st
+      (:keydown (hold-down app))
+      (:keyup (hold-up app)))))
 
 (start)

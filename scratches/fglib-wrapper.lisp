@@ -24,7 +24,7 @@
                                      '("/home/grolter/jars/javafx-sdk-21/lib"
                                        "/usr/share/java/kotlin-stdlib.jar"
                                        "/home/grolter/jars/fglib-v0.8.8.1.jar"
-                                        "/home/grolter/jars/ProjectAAA.jar"
+                                       "/home/grolter/jars/ProjectAAA.jar"
                                        ))))
                         (,(concatenate
                            'string
@@ -36,7 +36,7 @@
                                         ;"javafx.fxml"
                                        "kotlin.stdlib"
                                        "FGLib_K"
-                                        "ProjectAAA"
+                                       "ProjectAAA"
                                        ))))
                         ("-Xrs")))
 
@@ -49,7 +49,24 @@
 (j:define-native-method "gleefre/wrapper/fglib/LispExtension" "update" :void ()
   (format t "Game is running: ~A~%" *clock*))
 
-(j:with-env ()
+
+(defmacro je (&body body &aux (env (gensym)) (e (gensym)))
+  `(block nil
+     (j:with-env (,env)
+       (unwind-protect (progn ,@body)
+         (let ((,e (jll:exception-occurred ,env)))
+           (unless (cffi:null-pointer-p ,e)
+             (return
+               (multiple-value-prog1 (values (j:jstring-to-string
+                                              (j:jcall :string ("java/lang/Class" "getCanonicalName")
+                                                       (jll:get-object-class ,env ,e)))
+                                             (j:jstring-to-string
+                                              (j:jcall :string ("java/lang/Throwable" "toString") ,e))
+                                             (j:jstring-to-string
+                                              (j:jcall :string ("java/lang/Throwable" "getMessage") ,e)))
+                 (jll:exception-clear ,env)))))))))
+
+(je
   (j:jcall :void ("com/uzery/fglib/core/program/Launcher" "startProcess")
            (j:jclass "com/uzery/fglib/core/program/Launcher")
            (:array (:class "com/uzery/fglib/core/program/Extension"))

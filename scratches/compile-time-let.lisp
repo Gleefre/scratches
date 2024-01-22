@@ -23,6 +23,10 @@
   (declare (ignore getter))
   (funcall setter value))
 
+(defmacro compile-time! (&environment %env
+                         name &optional (env %env))
+  (macroexpand `(compile-time ,name) env))
+
 (defmacro compile-time (name &optional (default nil default-p))
   (if default-p
       default

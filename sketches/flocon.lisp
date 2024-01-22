@@ -51,7 +51,7 @@
 
 (defsketch flocon ((d 2)
                    (polygon (flocon d)))
-  (fit (* 4 +c+) (* 4 +c+) sketch::instance)
+  (fit (* 4 +c+) (* 4 +c+) sketch::*sketch*)
   (apply #'sketch::draw-shape polygon)
   (text (format nil "~a" d) (* 2 +c+) (* 2 +c+)))
 

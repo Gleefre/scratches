@@ -27,3 +27,5 @@
     (circle r 0 rad)
     (circle (+ r 7) (* dir 11) 3)
     (circle (- r 6) (* dir 12) 3)))
+
+(make-instance 'app)

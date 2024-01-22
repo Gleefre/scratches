@@ -92,3 +92,5 @@
       ((:scancode-right :scancode-d) (move-cursor app 1 0))
       ((:scancode-down :scancode-s) (move-cursor app 0 1))
       ((:scancode-up :scancode-w) (move-cursor app 0 -1)))))
+
+(make-instance 'euler-knight)

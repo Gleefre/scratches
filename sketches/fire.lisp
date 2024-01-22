@@ -123,6 +123,7 @@
       (sketch-utils:with-fit (600 600 100 100)
         (text (format nil "FPS ~$  Particles: ~A" (funcall fps-counter :report) (length particles))
               5
-              -10)))))
+              -10))))
+  (sdl2:gl-set-swap-interval 0))
 
 (make-instance 'fire :resizable t)

@@ -77,9 +77,9 @@
     (case (sdl2:scancode keysym)
       ;; dispatch on the key we pressed
       ((:scancode-w :scancode-up)
-       (decf (weird-y w)))
+       (decf (weird-y w) 10))
       ((:scancode-a :scancode-down)
-       (incf (weird-y w)))
+       (incf (weird-y w) 10))
       ))
 
   ;; It works!
