@@ -18,9 +18,9 @@ no-env -- implementation doesn't support passing lexical environment
 | cmucl   | 21E Unicode | NO              | -                | -              | YES     | YES         |
 | ccl     | 1.12        | +               | -                | -              | YES     | YES         |
 | allegro | 11.0        | +               | -                | -              | -       | YES         |
-| ecl     | v23.9.9     | NO              | YES (runtime)    | -              | YES     | YES         |
-| abcl    | v1.9.2      | +               | -                | -              | -       | -           |
-| clisp   | v2.49.93+   | ±, no-env       | YES (logic)      | YES            | -       | YES         |
+| ecl     | 23.9.9      | NO              | YES (runtime)    | -              | YES     | YES         |
+| abcl    | 1.9.2       | +               | -                | -              | -       | YES (ints)  |
+| clisp   | 2.49.93+    | ±, no-env       | YES (logic)      | YES            | -       | YES         |
 | LW      | 8.0.1       | +               | -                | YES            | YES     | YES         |
 | corman  | 3.1 (wine)  | +               | YES (logic)      | YES            | -       | YES         |
 | mkcl    | 1.1.11.188  | NO              | YES (warning)    | -              | YES     | YES         |
@@ -197,3 +197,16 @@ SM -- SYMBOL-MACROLET
                          (macroexpand-all '(tagbody (not-tag)))
                          :test 'equal))))
         (macroexpand-all '(tagbody (not-tag))))
+
+(defmacro not-tag-int () 1514)
+
+(format t "~&Test 5' (integer tag)~%  Wrong macro expansion in TAGBODY: ~A~%    expansion: ~S~%"
+        (not
+         (null
+          (or (tree-find '(tagbody 1514)
+                         (macroexpand-all '(tagbody (not-tag-int)))
+                         :test 'equal)
+              (tree-find '(tagbody)
+                         (macroexpand-all '(tagbody (not-tag-int)))
+                         :test 'equal))))
+        (macroexpand-all '(tagbody (not-tag-int))))
