@@ -5,24 +5,25 @@ clasp is not tested because it doesn't provide an implementation of macroexpand-
 Allegro, LW, CormanCL and MKCL support passing lexical environment,
 but TRIVIAL-MACROEXPAND-ALL doesn't support it.
 
-declarations bug -- DECLARE is not processed correctly, for example placed in a PROGN. ;
+declarations bug -- DECLARE is not processed correctly, for example placed in a PROGN.
 lambda bug -- doesn't expand LAMBDA, even though it is a macro (common behavior).
-tagbody bug -- expands symbol macros in the tag positions in TAGBODY.
+tag bug -- expands symbol macros in the tag positions in TAGBODY.
+not tag bug -- after expanding macros in the tagbody single symbols expansions can become tags.
 
 no-env -- implementation doesn't support passing lexical environment
 
-| impl    | version     | all macro types | declarations bug | expands LAMBDA | tagbody bug |
-|---------+-------------+-----------------+------------------+----------------+-------------|
-| sbcl    | 2.4.10      | +               | -                | -              | -           |
-| cmucl   | 21E Unicode | NO              | -                | -              | YES         |
-| ccl     | 1.12        | +               | -                | -              | YES         |
-| allegro | 11.0        | +               | -                | -              | -           |
-| ecl     | 23.9.9      | NO              | YES (runtime)    | -              | YES         |
-| abcl    | 1.9.2       | +               | -                | -              | -           |
-| clisp   | 2.49.93+    | ±, no-env       | YES (logic)      | YES            | -           |
-| LW      | 8.0.1       | +               | -                | YES            | YES         |
-| corman  | 3.1 (wine)  | +               | YES (logic)      | YES            | -           |
-| mkcl    | 1.1.11.188  | NO              | YES (warning)    | -              | YES         |
+| impl    | version     | all macro types | declarations bug | expands LAMBDA | tag bug | not tag bug |
+|---------+-------------+-----------------+------------------+----------------+---------+-------------|
+| sbcl    | 2.4.10      | +               | -                | -              | -       | YES         |
+| cmucl   | 21E Unicode | NO              | -                | -              | YES     | YES         |
+| ccl     | 1.12        | +               | -                | -              | YES     | YES         |
+| allegro | 11.0        | +               | -                | -              | -       | YES         |
+| ecl     | v23.9.9     | NO              | YES (runtime)    | -              | YES     | YES         |
+| abcl    | v1.9.2      | +               | -                | -              | -       | -           |
+| clisp   | v2.49.93+   | ±, no-env       | YES (logic)      | YES            | -       | YES         |
+| LW      | 8.0.1       | +               | -                | YES            | YES     | YES         |
+| corman  | 3.1 (wine)  | +               | YES (logic)      | YES            | -       | YES         |
+| mkcl    | 1.1.11.188  | NO              | YES (warning)    | -              | YES     | YES         |
 
 
 M  -- macro
@@ -179,3 +180,20 @@ SM -- SYMBOL-MACROLET
                       '(symbol-macrolet ((tag (tag-expanded)))
                         (tagbody tag)))
                      :test 'equal))))
+
+;; Test 5
+;; Here we test whether single symbol expansions of macros are
+;; protected against becoming tags in TAGBODY
+
+(defmacro not-tag () 'tag-expanded)
+
+(format t "~&Test 5~%  Wrong macro expansion in TAGBODY: ~A~%    expansion: ~S~%"
+        (not
+         (null
+          (or (tree-find '(tagbody tag-expanded)
+                         (macroexpand-all '(tagbody (not-tag)))
+                         :test 'equal)
+              (tree-find '(tagbody)
+                         (macroexpand-all '(tagbody (not-tag)))
+                         :test 'equal))))
+        (macroexpand-all '(tagbody (not-tag))))
