@@ -14,16 +14,16 @@ no-env -- implementation doesn't support passing lexical environment
 
 | impl    | version     | all macro types | declarations bug | expands LAMBDA | tag bug | not tag bug |
 |---------+-------------+-----------------+------------------+----------------+---------+-------------|
-| sbcl    | 2.4.10      | +               | -                | -              | -       | YES         |
-| cmucl   | 21E Unicode | NO              | -                | -              | YES     | YES         |
-| ccl     | 1.12        | +               | -                | -              | YES     | YES         |
-| allegro | 11.0        | +               | -                | -              | -       | YES         |
-| ecl     | 23.9.9      | NO              | YES (runtime)    | -              | YES     | YES         |
-| abcl    | 1.9.2       | +               | -                | -              | -       | YES (ints)  |
-| clisp   | 2.49.93+    | ±, no-env       | YES (logic)      | YES            | -       | YES         |
-| LW      | 8.0.1       | +               | -                | YES            | YES     | YES         |
-| corman  | 3.1 (wine)  | +               | YES (logic)      | YES            | -       | YES         |
-| mkcl    | 1.1.11.188  | NO              | YES (warning)    | -              | YES     | YES         |
+| sbcl    | 2.4.10      | +               | -                | NO             | -       | YES         |
+| cmucl   | 21E Unicode | NO              | -                | NO             | YES     | YES         |
+| ccl     | 1.12        | +               | -                | NO             | YES     | YES         |
+| allegro | 11.0        | +               | -                | NO             | -       | YES         |
+| ecl     | 23.9.9      | NO              | YES (runtime)    | NO             | YES     | YES         |
+| abcl    | 1.9.2       | +               | -                | NO             | -       | YES (ints)  |
+| clisp   | 2.49.93+    | ±, no-env       | YES (logic)      | +              | -       | YES         |
+| LW      | 8.0.1       | +               | -                | +              | YES     | YES         |
+| corman  | 3.1 (wine)  | +               | YES (logic)      | +              | -       | YES         |
+| mkcl    | 1.1.11.188  | NO              | YES (warning)    | NO             | YES     | YES         |
 
 
 M  -- macro
