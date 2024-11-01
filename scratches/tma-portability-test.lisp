@@ -16,14 +16,14 @@ no-env -- implementation doesn't support passing lexical environment
 |---------+-------------+-----------------+------------------+----------------+---------+-------------|
 | sbcl    | 2.4.10      | +               | -                | NO             | -       | YES         |
 | cmucl   | 21E Unicode | NO              | -                | NO             | YES     | YES         |
-| ccl     | 1.12        | +               | -                | NO             | YES     | YES         |
+| ccl     | 1.13        | +               | -                | NO             | YES     | YES         |
 | allegro | 11.0        | +               | -                | NO             | -       | YES         |
-| ecl     | 23.9.9      | NO              | YES (runtime)    | NO             | YES     | YES         |
+| ecl     | 24.5.10     | NO              | YES (runtime)    | NO             | YES     | YES         |
 | abcl    | 1.9.2       | +               | -                | NO             | -       | YES (ints)  |
 | clisp   | 2.49.93+    | ±, no-env       | YES (logic)      | +              | -       | YES         |
 | LW      | 8.0.1       | +               | -                | +              | YES     | YES         |
 | corman  | 3.1 (wine)  | +               | YES (logic)      | +              | -       | YES         |
-| mkcl    | 1.1.11.188  | NO              | YES (warning)    | NO             | YES     | YES         |
+| mkcl    | 1.1.11.206  | NO              | YES (warning)    | NO             | YES     | YES         |
 
 
 M  -- macro
@@ -60,7 +60,7 @@ SM -- SYMBOL-MACROLET
 | clisp   | Converts M to PROGN, unless body is 0--1 form; Keeps SM           |
 | LW      | Keeps M / SM; merges declarations, removes them if empty          |
 | corman  | Converts M to LET (); converts SM to PROGN ()                     |
-| mkcl    | Keeps M / SM                                                      |
+| mkcl    | Keeps M / SM; warns on declarations in SM                         |
 
 |#
 
